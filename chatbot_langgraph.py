@@ -14,6 +14,7 @@ from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.constants import Send
 
 from database import DatabaseConnection
 from hotel_search_service import HotelSearchService
@@ -387,26 +388,93 @@ Always be helpful and provide the most relevant information based on the user's 
             response = self.llm_with_tools.invoke(messages)
             return {"messages": [response]}
         
-        # Define the tool execution node
-        def should_continue(state: State):
-            """Determine if we should continue to tools or end"""
-            messages = state["messages"]
-            last_message = messages[-1]
+        # Define individual tool nodes
+        def search_hotels_by_city_node(state: State):
+            tool_call = state["messages"][-1].tool_calls[0]
+            result = HotelBotTools.search_hotels_by_city.invoke(tool_call["args"])
+            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
+        
+        def search_hotels_by_rating_node(state: State):
+            tool_call = state["messages"][-1].tool_calls[0]
+            result = HotelBotTools.search_hotels_by_rating.invoke(tool_call["args"])
+            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
+        
+        def get_available_rooms_node(state: State):
+            tool_call = state["messages"][-1].tool_calls[0]
+            result = HotelBotTools.get_available_rooms.invoke(tool_call["args"])
+            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
+        
+        def get_room_types_and_prices_node(state: State):
+            tool_call = state["messages"][-1].tool_calls[0]
+            result = HotelBotTools.get_room_types_and_prices.invoke(tool_call["args"])
+            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
+        
+        def search_hotels_by_price_range_node(state: State):
+            tool_call = state["messages"][-1].tool_calls[0]
+            result = HotelBotTools.search_hotels_by_price_range.invoke(tool_call["args"])
+            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
+        
+        def get_hotel_details_node(state: State):
+            tool_call = state["messages"][-1].tool_calls[0]
+            result = HotelBotTools.get_hotel_details.invoke(tool_call["args"])
+            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
+        
+        def search_hotel_by_name_node(state: State):
+            tool_call = state["messages"][-1].tool_calls[0]
+            result = HotelBotTools.search_hotel_by_name.invoke(tool_call["args"])
+            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
+        
+        # Route to appropriate tool nodes
+        def route_tools(state: State):
+            """Route to appropriate tool nodes based on tool calls"""
+            last_message = state["messages"][-1]
             
-            # If the LLM makes a tool call, then we route to the "tools" node
-            if last_message.tool_calls:
-                return "tools"
-            # Otherwise, we stop (reply to the user)
-            return END
+            if not last_message.tool_calls:
+                return END
+            
+            # Send to appropriate tool nodes based on tool names
+            tool_calls = []
+            for tool_call in last_message.tool_calls:
+                tool_name = tool_call["name"]
+                if tool_name == "search_hotels_by_city":
+                    tool_calls.append(Send("search_hotels_by_city_node", {"messages": [last_message]}))
+                elif tool_name == "search_hotels_by_rating":
+                    tool_calls.append(Send("search_hotels_by_rating_node", {"messages": [last_message]}))
+                elif tool_name == "get_available_rooms":
+                    tool_calls.append(Send("get_available_rooms_node", {"messages": [last_message]}))
+                elif tool_name == "get_room_types_and_prices":
+                    tool_calls.append(Send("get_room_types_and_prices_node", {"messages": [last_message]}))
+                elif tool_name == "search_hotels_by_price_range":
+                    tool_calls.append(Send("search_hotels_by_price_range_node", {"messages": [last_message]}))
+                elif tool_name == "get_hotel_details":
+                    tool_calls.append(Send("get_hotel_details_node", {"messages": [last_message]}))
+                elif tool_name == "search_hotel_by_name":
+                    tool_calls.append(Send("search_hotel_by_name_node", {"messages": [last_message]}))
+            
+            return tool_calls
         
         # Add nodes to the graph
         workflow.add_node("chatbot", chatbot)
-        workflow.add_node("tools", ToolNode(self.tools))
+        workflow.add_node("search_hotels_by_city_node", search_hotels_by_city_node)
+        workflow.add_node("search_hotels_by_rating_node", search_hotels_by_rating_node)
+        workflow.add_node("get_available_rooms_node", get_available_rooms_node)
+        workflow.add_node("get_room_types_and_prices_node", get_room_types_and_prices_node)
+        workflow.add_node("search_hotels_by_price_range_node", search_hotels_by_price_range_node)
+        workflow.add_node("get_hotel_details_node", get_hotel_details_node)
+        workflow.add_node("search_hotel_by_name_node", search_hotel_by_name_node)
         
         # Add edges
         workflow.add_edge(START, "chatbot")
-        workflow.add_conditional_edges("chatbot", should_continue)
-        workflow.add_edge("tools", "chatbot")
+        workflow.add_conditional_edges("chatbot", route_tools)
+        
+        # All tool nodes return to chatbot
+        workflow.add_edge("search_hotels_by_city_node", "chatbot")
+        workflow.add_edge("search_hotels_by_rating_node", "chatbot")
+        workflow.add_edge("get_available_rooms_node", "chatbot")
+        workflow.add_edge("get_room_types_and_prices_node", "chatbot")
+        workflow.add_edge("search_hotels_by_price_range_node", "chatbot")
+        workflow.add_edge("get_hotel_details_node", "chatbot")
+        workflow.add_edge("search_hotel_by_name_node", "chatbot")
         
         # Compile the graph
         return workflow.compile(checkpointer=self.memory)
