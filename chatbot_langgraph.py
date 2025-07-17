@@ -3,6 +3,7 @@ import json
 from typing import List, Dict, Optional, Any, Annotated, TypedDict
 from datetime import datetime, date
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langchain_openai import ChatOpenAI
 from langchain.schema import BaseMessage, HumanMessage, AIMessage
@@ -388,70 +389,151 @@ Always be helpful and provide the most relevant information based on the user's 
             response = self.llm_with_tools.invoke(messages)
             return {"messages": [response]}
         
-        # Define individual tool nodes
+        # Define individual tool nodes - each handles multiple calls of the same tool in parallel
         def search_hotels_by_city_node(state: State):
-            tool_call = state["messages"][-1].tool_calls[0]
-            result = HotelBotTools.search_hotels_by_city.invoke(tool_call["args"])
-            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
+            tool_calls = [tc for tc in state["messages"][-1].tool_calls if tc["name"] == "search_hotels_by_city"]
+            results = []
+            
+            # Execute multiple calls of the same tool in parallel using ThreadPoolExecutor
+            def execute_tool_call(tool_call):
+                result = HotelBotTools.search_hotels_by_city.invoke(tool_call["args"])
+                return ToolMessage(content=result, tool_call_id=tool_call["id"])
+            
+            with ThreadPoolExecutor(max_workers=len(tool_calls)) as executor:
+                future_to_tool = {executor.submit(execute_tool_call, tc): tc for tc in tool_calls}
+                for future in as_completed(future_to_tool):
+                    results.append(future.result())
+            
+            return {"messages": results}
         
         def search_hotels_by_rating_node(state: State):
-            tool_call = state["messages"][-1].tool_calls[0]
-            result = HotelBotTools.search_hotels_by_rating.invoke(tool_call["args"])
-            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
+            tool_calls = [tc for tc in state["messages"][-1].tool_calls if tc["name"] == "search_hotels_by_rating"]
+            results = []
+            
+            def execute_tool_call(tool_call):
+                result = HotelBotTools.search_hotels_by_rating.invoke(tool_call["args"])
+                return ToolMessage(content=result, tool_call_id=tool_call["id"])
+            
+            with ThreadPoolExecutor(max_workers=len(tool_calls)) as executor:
+                future_to_tool = {executor.submit(execute_tool_call, tc): tc for tc in tool_calls}
+                for future in as_completed(future_to_tool):
+                    results.append(future.result())
+            
+            return {"messages": results}
         
         def get_available_rooms_node(state: State):
-            tool_call = state["messages"][-1].tool_calls[0]
-            result = HotelBotTools.get_available_rooms.invoke(tool_call["args"])
-            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
+            tool_calls = [tc for tc in state["messages"][-1].tool_calls if tc["name"] == "get_available_rooms"]
+            results = []
+            
+            def execute_tool_call(tool_call):
+                result = HotelBotTools.get_available_rooms.invoke(tool_call["args"])
+                return ToolMessage(content=result, tool_call_id=tool_call["id"])
+            
+            with ThreadPoolExecutor(max_workers=len(tool_calls)) as executor:
+                future_to_tool = {executor.submit(execute_tool_call, tc): tc for tc in tool_calls}
+                for future in as_completed(future_to_tool):
+                    results.append(future.result())
+            
+            return {"messages": results}
         
         def get_room_types_and_prices_node(state: State):
-            tool_call = state["messages"][-1].tool_calls[0]
-            result = HotelBotTools.get_room_types_and_prices.invoke(tool_call["args"])
-            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
+            tool_calls = [tc for tc in state["messages"][-1].tool_calls if tc["name"] == "get_room_types_and_prices"]
+            results = []
+            
+            def execute_tool_call(tool_call):
+                result = HotelBotTools.get_room_types_and_prices.invoke(tool_call["args"])
+                return ToolMessage(content=result, tool_call_id=tool_call["id"])
+            
+            with ThreadPoolExecutor(max_workers=len(tool_calls)) as executor:
+                future_to_tool = {executor.submit(execute_tool_call, tc): tc for tc in tool_calls}
+                for future in as_completed(future_to_tool):
+                    results.append(future.result())
+            
+            return {"messages": results}
         
         def search_hotels_by_price_range_node(state: State):
-            tool_call = state["messages"][-1].tool_calls[0]
-            result = HotelBotTools.search_hotels_by_price_range.invoke(tool_call["args"])
-            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
+            tool_calls = [tc for tc in state["messages"][-1].tool_calls if tc["name"] == "search_hotels_by_price_range"]
+            results = []
+            
+            def execute_tool_call(tool_call):
+                result = HotelBotTools.search_hotels_by_price_range.invoke(tool_call["args"])
+                return ToolMessage(content=result, tool_call_id=tool_call["id"])
+            
+            with ThreadPoolExecutor(max_workers=len(tool_calls)) as executor:
+                future_to_tool = {executor.submit(execute_tool_call, tc): tc for tc in tool_calls}
+                for future in as_completed(future_to_tool):
+                    results.append(future.result())
+            
+            return {"messages": results}
         
         def get_hotel_details_node(state: State):
-            tool_call = state["messages"][-1].tool_calls[0]
-            result = HotelBotTools.get_hotel_details.invoke(tool_call["args"])
-            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
+            tool_calls = [tc for tc in state["messages"][-1].tool_calls if tc["name"] == "get_hotel_details"]
+            results = []
+            
+            def execute_tool_call(tool_call):
+                result = HotelBotTools.get_hotel_details.invoke(tool_call["args"])
+                return ToolMessage(content=result, tool_call_id=tool_call["id"])
+            
+            with ThreadPoolExecutor(max_workers=len(tool_calls)) as executor:
+                future_to_tool = {executor.submit(execute_tool_call, tc): tc for tc in tool_calls}
+                for future in as_completed(future_to_tool):
+                    results.append(future.result())
+            
+            return {"messages": results}
         
         def search_hotel_by_name_node(state: State):
-            tool_call = state["messages"][-1].tool_calls[0]
-            result = HotelBotTools.search_hotel_by_name.invoke(tool_call["args"])
-            return {"messages": [ToolMessage(content=result, tool_call_id=tool_call["id"])]}
-        
+            tool_calls = [tc for tc in state["messages"][-1].tool_calls if tc["name"] == "search_hotel_by_name"]
+            results = []
+            
+            def execute_tool_call(tool_call):
+                result = HotelBotTools.search_hotel_by_name.invoke(tool_call["args"])
+                return ToolMessage(content=result, tool_call_id=tool_call["id"])
+            
+            with ThreadPoolExecutor(max_workers=len(tool_calls)) as executor:
+                future_to_tool = {executor.submit(execute_tool_call, tc): tc for tc in tool_calls}
+                for future in as_completed(future_to_tool):
+                    results.append(future.result())
+            
+            return {"messages": results}
         # Route to appropriate tool nodes
         def route_tools(state: State):
-            """Route to appropriate tool nodes based on tool calls"""
+            """Route to appropriate tool nodes based on tool calls - enables parallel execution"""
             last_message = state["messages"][-1]
             
             if not last_message.tool_calls:
                 return END
             
-            # Send to appropriate tool nodes based on tool names
-            tool_calls = []
+            # Group tool calls by tool name to enable parallel execution
+            tool_groups = {}
             for tool_call in last_message.tool_calls:
                 tool_name = tool_call["name"]
-                if tool_name == "search_hotels_by_city":
-                    tool_calls.append(Send("search_hotels_by_city_node", {"messages": [last_message]}))
-                elif tool_name == "search_hotels_by_rating":
-                    tool_calls.append(Send("search_hotels_by_rating_node", {"messages": [last_message]}))
-                elif tool_name == "get_available_rooms":
-                    tool_calls.append(Send("get_available_rooms_node", {"messages": [last_message]}))
-                elif tool_name == "get_room_types_and_prices":
-                    tool_calls.append(Send("get_room_types_and_prices_node", {"messages": [last_message]}))
-                elif tool_name == "search_hotels_by_price_range":
-                    tool_calls.append(Send("search_hotels_by_price_range_node", {"messages": [last_message]}))
-                elif tool_name == "get_hotel_details":
-                    tool_calls.append(Send("get_hotel_details_node", {"messages": [last_message]}))
-                elif tool_name == "search_hotel_by_name":
-                    tool_calls.append(Send("search_hotel_by_name_node", {"messages": [last_message]}))
+                if tool_name not in tool_groups:
+                    tool_groups[tool_name] = []
+                tool_groups[tool_name].append(tool_call)
             
-            return tool_calls
+            # Send each group to appropriate tool nodes for parallel execution
+            sends = []
+            for tool_name, tool_calls in tool_groups.items():
+                # Create a message with only the tool calls for this specific tool
+                tool_message = last_message.copy()
+                tool_message.tool_calls = tool_calls
+                
+                if tool_name == "search_hotels_by_city":
+                    sends.append(Send("search_hotels_by_city_node", {"messages": [tool_message]}))
+                elif tool_name == "search_hotels_by_rating":
+                    sends.append(Send("search_hotels_by_rating_node", {"messages": [tool_message]}))
+                elif tool_name == "get_available_rooms":
+                    sends.append(Send("get_available_rooms_node", {"messages": [tool_message]}))
+                elif tool_name == "get_room_types_and_prices":
+                    sends.append(Send("get_room_types_and_prices_node", {"messages": [tool_message]}))
+                elif tool_name == "search_hotels_by_price_range":
+                    sends.append(Send("search_hotels_by_price_range_node", {"messages": [tool_message]}))
+                elif tool_name == "get_hotel_details":
+                    sends.append(Send("get_hotel_details_node", {"messages": [tool_message]}))
+                elif tool_name == "search_hotel_by_name":
+                    sends.append(Send("search_hotel_by_name_node", {"messages": [tool_message]}))
+            
+            return sends
         
         # Add nodes to the graph
         workflow.add_node("chatbot", chatbot)
