@@ -633,8 +633,8 @@ class HotelBotLangGraph:
         
         # Initialize LLM
         self.llm = ChatOpenAI(
-            temperature=0.7,
-            model="gpt-3.5-turbo",
+            temperature=0.3,
+            model="gpt-4",
             openai_api_key=self.openai_api_key
         )
         
@@ -691,7 +691,15 @@ You have access to a comprehensive hotel database and can help users:
 - Search for available rooms by dates and location
 
 Booking Process Guidelines:
-- When users want to book a room, collect ALL required information: room_id, guest_name, guest_email, guest_phone, check_in_date, check_out_date
+- When users want to book a room, you MUST collect ALL required information step by step BEFORE calling the book_room tool:
+  1. First, identify the specific room they want to book (room_id)
+  2. Ask for their full name (guest_name)
+  3. Ask for their email address (guest_email)
+  4. Ask for their phone number (guest_phone)
+  5. Ask for check-in date (check_in_date)
+  6. Ask for check-out date (check_out_date)
+- NEVER book a room without collecting ALL this information from the user first
+- Do NOT use placeholder or example data - always ask the user for their actual details
 - Always check room availability for specific dates before booking
 - Use YYYY-MM-DD format for dates (e.g., 2025-07-25)
 - Validate that check-in date is not in the past and check-out is after check-in
@@ -710,6 +718,8 @@ General Guidelines:
 - Always include hotel IDs and room IDs in search results so users can reference them later
 - When showing hotel or room information, include relevant details like prices, ratings, and availability
 - For booking confirmations, provide booking ID and all relevant details
+- IMPORTANT: When a user wants to book a room, ask them one question at a time to collect their information step by step
+- Do NOT proceed with booking until you have collected ALL required information from the user
 
 Date Format: Always use YYYY-MM-DD format for dates (e.g., 2025-07-25, 2025-08-01)
 
