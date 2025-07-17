@@ -34,7 +34,6 @@ class HotelBotTools:
     
     def __init__(self):
         self.search_service = HotelSearchService()
-        self.db = DatabaseConnection()
         self.search_service.connect()
     
     def __del__(self):
@@ -232,24 +231,11 @@ class HotelBotTools:
             
             tools_instance = HotelBotTools()
             
-            # Get hotel info
-            hotel_query = """
-            SELECT h.*, 
-                   COUNT(hr.id) as total_rooms,
-                   COUNT(CASE WHEN hr.is_available = true THEN 1 END) as available_rooms
-            FROM hotels h
-            LEFT JOIN hotel_rooms hr ON h.id = hr.hotel_id
-            WHERE h.id = %s AND h.is_active = true
-            GROUP BY h.id, h.name, h.address, h.city, h.stars, h.description, h.phone_number, h.email, h.latitude, h.longitude, h.amenities, h.is_active, h.created_at, h.updated_at;
-            """
+            # Get hotel info using service layer
+            hotel = tools_instance.search_service.get_hotel_by_id(hotel_id_int)
             
-            tools_instance.db.connect()
-            hotels = tools_instance.db.execute_query(hotel_query, (hotel_id_int,))
-            
-            if not hotels:
+            if not hotel:
                 return f"Hotel with ID {hotel_id} not found."
-            
-            hotel = hotels[0]
             
             # Get room details
             rooms = tools_instance.search_service.get_available_rooms(hotel_id=hotel_id_int)
@@ -276,7 +262,6 @@ class HotelBotTools:
             else:
                 result += "No rooms currently available.\n"
             
-            tools_instance.db.disconnect()
             return result
             
         except ValueError:
@@ -290,24 +275,11 @@ class HotelBotTools:
         try:
             tools_instance = HotelBotTools()
             
-            # Search for hotel by name
-            search_query = """
-            SELECT h.*, 
-                   COUNT(hr.id) as total_rooms,
-                   COUNT(CASE WHEN hr.is_available = true THEN 1 END) as available_rooms
-            FROM hotels h
-            LEFT JOIN hotel_rooms hr ON h.id = hr.hotel_id
-            WHERE LOWER(h.name) LIKE LOWER(%s) AND h.is_active = true
-            GROUP BY h.id, h.name, h.address, h.city, h.stars, h.description, h.phone_number, h.email, h.latitude, h.longitude, h.amenities, h.is_active, h.created_at, h.updated_at;
-            """
+            # Search for hotel by name using service layer
+            hotel = tools_instance.search_service.search_hotel_by_name(hotel_name)
             
-            tools_instance.db.connect()
-            hotels = tools_instance.db.execute_query(search_query, (f"%{hotel_name}%",))
-            
-            if not hotels:
+            if not hotel:
                 return f"No hotel found with name '{hotel_name}'. Please try a different name or search by city."
-            
-            hotel = hotels[0]
             
             # Get available rooms for this hotel
             rooms = tools_instance.search_service.get_available_rooms(hotel_id=hotel['id'])
@@ -345,7 +317,6 @@ class HotelBotTools:
             else:
                 result += "No rooms currently available at this hotel.\n"
             
-            tools_instance.db.disconnect()
             return result
             
         except Exception as e:
@@ -373,43 +344,18 @@ class HotelBotTools:
             
             room_id_int = int(room_id)
             
-            tools_instance.db.connect()
+            tools_instance = HotelBotTools()
             
             # First check if room exists and is generally available
-            room_query = """
-            SELECT hr.*, h.name as hotel_name, h.city, h.address, h.phone_number
-            FROM hotel_rooms hr
-            JOIN hotels h ON hr.hotel_id = h.id
-            WHERE hr.id = %s AND hr.is_available = true AND h.is_active = true
-            """
-            room_result = tools_instance.db.execute_query(room_query, (room_id_int,))
+            room = tools_instance.search_service.get_room_by_id(room_id_int)
             
-            if not room_result:
+            if not room:
                 return f"Room with ID {room_id} not found or not available."
             
-            room = room_result[0]
-            
             # Check for conflicting bookings
-            booking_conflict_query = """
-            SELECT COUNT(*) as conflict_count
-            FROM bookings
-            WHERE room_id = %s 
-            AND status = 'confirmed'
-            AND (
-                (check_in <= %s AND check_out > %s) OR
-                (check_in < %s AND check_out >= %s) OR
-                (check_in >= %s AND check_out <= %s)
-            )
-            """
+            conflict_count = tools_instance.search_service.check_booking_conflict(room_id_int, check_in, check_out)
             
-            conflict_result = tools_instance.db.execute_query(
-                booking_conflict_query, 
-                (room_id_int, check_in, check_in, check_out, check_out, check_in, check_out)
-            )
-            
-            tools_instance.db.disconnect()
-            
-            if conflict_result[0]['conflict_count'] > 0:
+            if conflict_count > 0:
                 return f"❌ Room {room['room_number']} at {room['hotel_name']} is not available for {check_in_date} to {check_out_date}. Please choose different dates or another room."
             
             # Calculate stay details
@@ -473,43 +419,18 @@ class HotelBotTools:
             
             room_id_int = int(room_id)
             
-            tools_instance.db.connect()
+            tools_instance = HotelBotTools()
             
             # Check if room is still available for the requested dates
-            room_check_query = """
-            SELECT hr.*, h.name as hotel_name, h.city, h.address, h.phone_number, h.email as hotel_email
-            FROM hotel_rooms hr
-            JOIN hotels h ON hr.hotel_id = h.id
-            WHERE hr.id = %s AND hr.is_available = true AND h.is_active = true
-            """
-            room_result = tools_instance.db.execute_query(room_check_query, (room_id_int,))
+            room = tools_instance.search_service.get_room_by_id(room_id_int)
             
-            if not room_result:
-                tools_instance.db.disconnect()
+            if not room:
                 return f"Room with ID {room_id} not found or not available."
             
-            room = room_result[0]
-            
             # Check for conflicting bookings
-            booking_conflict_query = """
-            SELECT COUNT(*) as conflict_count
-            FROM bookings
-            WHERE room_id = %s 
-            AND status = 'confirmed'
-            AND (
-                (check_in <= %s AND check_out > %s) OR
-                (check_in < %s AND check_out >= %s) OR
-                (check_in >= %s AND check_out <= %s)
-            )
-            """
+            conflict_count = tools_instance.search_service.check_booking_conflict(room_id_int, check_in, check_out)
             
-            conflict_result = tools_instance.db.execute_query(
-                booking_conflict_query, 
-                (room_id_int, check_in, check_in, check_out, check_out, check_in, check_out)
-            )
-            
-            if conflict_result[0]['conflict_count'] > 0:
-                tools_instance.db.disconnect()
+            if conflict_count > 0:
                 return f"❌ Room {room['room_number']} at {room['hotel_name']} is not available for {check_in_date} to {check_out_date}. Please choose different dates or another room."
 
             
@@ -517,32 +438,17 @@ class HotelBotTools:
             nights = (check_out - check_in).days
             total_amount = float(room['price_per_night']) * nights
             
-            # Create booking
-            booking_query = """
-            INSERT INTO bookings (room_id, guest_name, guest_email, guest_phone, check_in, check_out, total_amount, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id;
-            """
+            # Create booking using service layer
+            booking_id = tools_instance.search_service.create_booking(
+                room_id_int, guest_name, guest_email, guest_phone, check_in, check_out, total_amount
+            )
             
-            # Use execute_update for INSERT operations
-            tools_instance.db.cursor.execute(booking_query, 
-                (room_id_int, guest_name, guest_email, guest_phone, check_in, check_out, total_amount, 'confirmed'))
-            tools_instance.db.connection.commit()
-            
-            booking_result = tools_instance.db.cursor.fetchone()
-            
-            if not booking_result:
-                tools_instance.db.disconnect()
+            if not booking_id:
                 return "Error creating booking. Please try again."
-            
-            booking_id = booking_result['id']
             
             # Update room availability if booking is for current dates
             if check_in <= date.today() <= check_out:
-                update_query = "UPDATE hotel_rooms SET is_available = FALSE WHERE id = %s"
-                tools_instance.db.execute_update(update_query, (room_id_int,))
-            
-            tools_instance.db.disconnect()
+                tools_instance.search_service.update_room_availability(room_id_int, False)
             
             # Generate booking confirmation
             result = f"🎉 Booking Confirmed! 🎉\n\n"
@@ -579,26 +485,10 @@ class HotelBotTools:
             tools_instance = HotelBotTools()
             booking_id_int = int(booking_id)
             
-            tools_instance.db.connect()
+            booking = tools_instance.search_service.get_booking_by_id(booking_id_int)
             
-            booking_query = """
-            SELECT b.*, 
-                   hr.room_number, hr.room_type, hr.capacity, hr.price_per_night,
-                   h.name as hotel_name, h.city, h.address, h.phone_number, h.email as hotel_email
-            FROM bookings b
-            JOIN hotel_rooms hr ON b.room_id = hr.id
-            JOIN hotels h ON hr.hotel_id = h.id
-            WHERE b.id = %s
-            """
-            
-            booking_result = tools_instance.db.execute_query(booking_query, (booking_id_int,))
-            
-            if not booking_result:
-                tools_instance.db.disconnect()
+            if not booking:
                 return f"Booking with ID {booking_id} not found."
-            
-            booking = booking_result[0]
-            tools_instance.db.disconnect()
             
             # Calculate nights
             nights = (booking['check_out'] - booking['check_in']).days
@@ -638,37 +528,18 @@ class HotelBotTools:
             tools_instance = HotelBotTools()
             booking_id_int = int(booking_id)
             
-            tools_instance.db.connect()
-            
             # Get booking details first
-            booking_query = """
-            SELECT b.*, 
-                   hr.room_number, hr.room_type,
-                   h.name as hotel_name
-            FROM bookings b
-            JOIN hotel_rooms hr ON b.room_id = hr.id
-            JOIN hotels h ON hr.hotel_id = h.id
-            WHERE b.id = %s AND b.status = 'confirmed'
-            """
+            booking = tools_instance.search_service.get_confirmed_booking_by_id(booking_id_int)
             
-            booking_result = tools_instance.db.execute_query(booking_query, (booking_id_int,))
-            
-            if not booking_result:
-                tools_instance.db.disconnect()
+            if not booking:
                 return f"Booking with ID {booking_id} not found or already cancelled."
             
-            booking = booking_result[0]
-            
             # Update booking status
-            cancel_query = "UPDATE bookings SET status = 'cancelled' WHERE id = %s"
-            tools_instance.db.execute_update(cancel_query, (booking_id_int,))
+            tools_instance.search_service.cancel_booking(booking_id_int)
             
             # If booking was for current dates, make room available again
             if booking['check_in'] <= date.today() <= booking['check_out']:
-                room_query = "UPDATE hotel_rooms SET is_available = TRUE WHERE id = %s"
-                tools_instance.db.execute_update(room_query, (booking['room_id'],))
-            
-            tools_instance.db.disconnect()
+                tools_instance.search_service.update_room_availability(booking['room_id'], True)
             
             result = f"❌ Booking Cancelled\n\n"
             result += f"📋 Booking ID: {booking_id}\n"
@@ -710,47 +581,19 @@ class HotelBotTools:
             if check_in < date.today():
                 return "Check-in date cannot be in the past."
             
-            tools_instance.db.connect()
-            
-            # Build query with date availability check
-            query = """
-            SELECT hr.*, h.name as hotel_name, h.city, h.address, h.stars, h.amenities
-            FROM hotel_rooms hr
-            JOIN hotels h ON hr.hotel_id = h.id
-            WHERE h.is_active = true 
-            AND hr.is_available = true
-            AND LOWER(h.city) LIKE LOWER(%s)
-            AND hr.id NOT IN (
-                SELECT DISTINCT room_id 
-                FROM bookings 
-                WHERE status = 'confirmed' 
-                AND (
-                    (check_in <= %s AND check_out > %s) OR
-                    (check_in < %s AND check_out >= %s) OR
-                    (check_in >= %s AND check_out <= %s)
-                )
-            )
-            """
-            
-            params = [f"%{city}%", check_in, check_in, check_out, check_out, check_in, check_out]
-            
-            # Add optional filters
-            if room_type:
-                query += " AND LOWER(hr.room_type::text) LIKE LOWER(%s)"
-                params.append(f"%{room_type}%")
-            
+            # Parse optional filters
+            room_type_filter = room_type if room_type else None
+            max_price_filter = None
             if max_price:
                 try:
-                    max_price_float = float(max_price)
-                    query += " AND hr.price_per_night <= %s"
-                    params.append(max_price_float)
+                    max_price_filter = float(max_price)
                 except ValueError:
                     pass
             
-            query += " ORDER BY h.stars DESC, hr.price_per_night ASC"
-            
-            rooms = tools_instance.db.execute_query(query, params)
-            tools_instance.db.disconnect()
+            # Search for available rooms using service layer
+            rooms = tools_instance.search_service.search_available_rooms_by_dates(
+                city, check_in, check_out, room_type_filter, max_price_filter
+            )
             
             if not rooms:
                 return f"No available rooms found in {city} for {check_in_date} to {check_out_date}."
