@@ -1,7 +1,8 @@
 import os
 import json
+import re
 from typing import List, Dict, Optional, Any, Annotated, TypedDict
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -56,10 +57,15 @@ class HotelBotTools:
             result = f"Found {len(hotels)} hotels in {city}:\n\n"
             for hotel in hotels:
                 result += f"🏨 **{hotel['name']}** (Hotel ID: {hotel['id']})\n"
-                result += f"   📍 {hotel['address']}, {hotel['city']}, {hotel['country']}\n"
-                result += f"   ⭐ Rating: {hotel['rating']}/5.0\n"
+                result += f"   📍 {hotel['address']}, {hotel['city']}\n"
+                result += f"   ⭐ Stars: {hotel['stars']}/5\n"
+                if hotel.get('description'):
+                    result += f"   📝 {hotel['description']}\n"
                 result += f"   🏠 Total Rooms: {hotel['total_rooms']}\n"
-                result += f"   ✅ Available Rooms: {hotel['available_rooms']}\n\n"
+                result += f"   ✅ Available Rooms: {hotel['available_rooms']}\n"
+                if hotel.get('amenities'):
+                    result += f"   🎯 Amenities: {', '.join(hotel['amenities'])}\n"
+                result += "\n"
             
             return result
             
@@ -80,12 +86,17 @@ class HotelBotTools:
             if not hotels:
                 return f"No hotels found with rating {rating} or higher."
             
-            result = f"Found {len(hotels)} hotels with rating {rating}+ stars:\n\n"
+            result = f"Found {len(hotels)} hotels with {rating}+ stars:\n\n"
             for hotel in hotels:
                 result += f"🏨 **{hotel['name']}** (Hotel ID: {hotel['id']})\n"
-                result += f"   📍 {hotel['city']}, {hotel['country']}\n"
-                result += f"   ⭐ Rating: {hotel['rating']}/5.0\n"
-                result += f"   🏠 Available Rooms: {hotel['available_rooms']}\n\n"
+                result += f"   📍 {hotel['city']}\n"
+                result += f"   ⭐ Stars: {hotel['stars']}/5\n"
+                if hotel.get('description'):
+                    result += f"   📝 {hotel['description']}\n"
+                result += f"   🏠 Available Rooms: {hotel['available_rooms']}\n"
+                if hotel.get('amenities'):
+                    result += f"   🎯 Amenities: {', '.join(hotel['amenities'])}\n"
+                result += "\n"
             
             return result
             
@@ -137,7 +148,11 @@ class HotelBotTools:
                 result += f"   🏨 Hotel: {room['hotel_name']}\n"
                 result += f"   📍 Location: {room['city']}\n"
                 result += f"   💰 Price: ${room['price_per_night']}/night\n"
-                result += f"   🆔 Room ID: {room['id']}\n\n"
+                result += f"   👥 Capacity: {room['capacity']} guests\n"
+                result += f"   🆔 Room ID: {room['id']}\n"
+                if room.get('amenities'):
+                    result += f"   🎯 Amenities: {', '.join(room['amenities'])}\n"
+                result += "\n"
             
             return result
             
@@ -192,10 +207,15 @@ class HotelBotTools:
             result = f"Found {len(hotels)} hotels with rooms in ${min_price} - ${max_price} range:\n\n"
             for hotel in hotels:
                 result += f"🏨 **{hotel['name']}**\n"
-                result += f"   📍 {hotel['city']}, {hotel['country']}\n"
-                result += f"   ⭐ Rating: {hotel['rating']}/5.0\n"
+                result += f"   📍 {hotel['city']}\n"
+                result += f"   ⭐ Stars: {hotel['stars']}/5\n"
+                if hotel.get('description'):
+                    result += f"   📝 {hotel['description']}\n"
                 result += f"   💰 Room Price Range: ${hotel['min_room_price']:.2f} - ${hotel['max_room_price']:.2f}\n"
-                result += f"   🏠 Available Rooms: {hotel['total_rooms']}\n\n"
+                result += f"   🏠 Available Rooms: {hotel['total_rooms']}\n"
+                if hotel.get('amenities'):
+                    result += f"   🎯 Amenities: {', '.join(hotel['amenities'])}\n"
+                result += "\n"
             
             return result
             
@@ -215,12 +235,12 @@ class HotelBotTools:
             # Get hotel info
             hotel_query = """
             SELECT h.*, 
-                   COUNT(r.id) as total_rooms,
-                   COUNT(CASE WHEN r.is_available = true THEN 1 END) as available_rooms
+                   COUNT(hr.id) as total_rooms,
+                   COUNT(CASE WHEN hr.is_available = true THEN 1 END) as available_rooms
             FROM hotels h
-            LEFT JOIN rooms r ON h.id = r.hotel_id
-            WHERE h.id = %s
-            GROUP BY h.id, h.name, h.address, h.city, h.country, h.rating, h.created_at;
+            LEFT JOIN hotel_rooms hr ON h.id = hr.hotel_id
+            WHERE h.id = %s AND h.is_active = true
+            GROUP BY h.id, h.name, h.address, h.city, h.stars, h.description, h.phone_number, h.email, h.latitude, h.longitude, h.amenities, h.is_active, h.created_at, h.updated_at;
             """
             
             tools_instance.db.connect()
@@ -235,15 +255,24 @@ class HotelBotTools:
             rooms = tools_instance.search_service.get_available_rooms(hotel_id=hotel_id_int)
             
             result = f"🏨 **{hotel['name']}** (ID: {hotel['id']})\n"
-            result += f"📍 Address: {hotel['address']}, {hotel['city']}, {hotel['country']}\n"
-            result += f"⭐ Rating: {hotel['rating']}/5.0\n"
+            result += f"📍 Address: {hotel['address']}, {hotel['city']}\n"
+            result += f"⭐ Stars: {hotel['stars']}/5\n"
+            if hotel.get('description'):
+                result += f"📝 Description: {hotel['description']}\n"
+            if hotel.get('phone_number'):
+                result += f"📞 Phone: {hotel['phone_number']}\n"
+            if hotel.get('email'):
+                result += f"📧 Email: {hotel['email']}\n"
             result += f"🏠 Total Rooms: {hotel['total_rooms']}\n"
-            result += f"✅ Available Rooms: {hotel['available_rooms']}\n\n"
+            result += f"✅ Available Rooms: {hotel['available_rooms']}\n"
+            if hotel.get('amenities'):
+                result += f"🎯 Amenities: {', '.join(hotel['amenities'])}\n"
+            result += "\n"
             
             if rooms:
                 result += "**Available Rooms:**\n"
                 for room in rooms:
-                    result += f"  • Room {room['room_number']} ({room['room_type']}) - ${room['price_per_night']}/night\n"
+                    result += f"  • Room {room['room_number']} ({room['room_type']}) - ${room['price_per_night']}/night (Capacity: {room['capacity']})\n"
             else:
                 result += "No rooms currently available.\n"
             
@@ -264,12 +293,12 @@ class HotelBotTools:
             # Search for hotel by name
             search_query = """
             SELECT h.*, 
-                   COUNT(r.id) as total_rooms,
-                   COUNT(CASE WHEN r.is_available = true THEN 1 END) as available_rooms
+                   COUNT(hr.id) as total_rooms,
+                   COUNT(CASE WHEN hr.is_available = true THEN 1 END) as available_rooms
             FROM hotels h
-            LEFT JOIN rooms r ON h.id = r.hotel_id
-            WHERE LOWER(h.name) LIKE LOWER(%s)
-            GROUP BY h.id, h.name, h.address, h.city, h.country, h.rating, h.created_at;
+            LEFT JOIN hotel_rooms hr ON h.id = hr.hotel_id
+            WHERE LOWER(h.name) LIKE LOWER(%s) AND h.is_active = true
+            GROUP BY h.id, h.name, h.address, h.city, h.stars, h.description, h.phone_number, h.email, h.latitude, h.longitude, h.amenities, h.is_active, h.created_at, h.updated_at;
             """
             
             tools_instance.db.connect()
@@ -284,10 +313,19 @@ class HotelBotTools:
             rooms = tools_instance.search_service.get_available_rooms(hotel_id=hotel['id'])
             
             result = f"🏨 **{hotel['name']}** (Hotel ID: {hotel['id']})\n"
-            result += f"📍 Address: {hotel['address']}, {hotel['city']}, {hotel['country']}\n"
-            result += f"⭐ Rating: {hotel['rating']}/5.0\n"
+            result += f"📍 Address: {hotel['address']}, {hotel['city']}\n"
+            result += f"⭐ Stars: {hotel['stars']}/5\n"
+            if hotel.get('description'):
+                result += f"📝 Description: {hotel['description']}\n"
+            if hotel.get('phone_number'):
+                result += f"📞 Phone: {hotel['phone_number']}\n"
+            if hotel.get('email'):
+                result += f"📧 Email: {hotel['email']}\n"
             result += f"🏠 Total Rooms: {hotel['total_rooms']}\n"
-            result += f"✅ Available Rooms: {hotel['available_rooms']}\n\n"
+            result += f"✅ Available Rooms: {hotel['available_rooms']}\n"
+            if hotel.get('amenities'):
+                result += f"🎯 Amenities: {', '.join(hotel['amenities'])}\n"
+            result += "\n"
             
             if rooms:
                 result += "**Available Room Types:**\n"
@@ -301,7 +339,7 @@ class HotelBotTools:
                 for room_type, type_rooms in room_types.items():
                     result += f"\n🏠 **{room_type}** ({len(type_rooms)} available)\n"
                     for room in type_rooms[:3]:  # Show first 3 rooms of each type
-                        result += f"  • Room {room['room_number']} - ${room['price_per_night']}/night\n"
+                        result += f"  • Room {room['room_number']} - ${room['price_per_night']}/night (Capacity: {room['capacity']})\n"
                     if len(type_rooms) > 3:
                         result += f"  • ... and {len(type_rooms) - 3} more {room_type} rooms\n"
             else:
@@ -312,6 +350,433 @@ class HotelBotTools:
             
         except Exception as e:
             return f"Error searching hotel by name: {str(e)}"
+
+    @tool
+    def check_room_availability_by_dates(room_id: str, check_in_date: str, check_out_date: str) -> str:
+        """Check if a specific room is available for given dates. Dates should be in YYYY-MM-DD format."""
+        try:
+            tools_instance = HotelBotTools()
+            
+            # Parse dates
+            try:
+                check_in = datetime.strptime(check_in_date, "%Y-%m-%d").date()
+                check_out = datetime.strptime(check_out_date, "%Y-%m-%d").date()
+            except ValueError:
+                return "Invalid date format. Please use YYYY-MM-DD format (e.g., 2024-12-25)."
+            
+            # Validate dates
+            if check_in >= check_out:
+                return "Check-out date must be after check-in date."
+            
+            if check_in < date.today():
+                return "Check-in date cannot be in the past."
+            
+            room_id_int = int(room_id)
+            
+            tools_instance.db.connect()
+            
+            # First check if room exists and is generally available
+            room_query = """
+            SELECT hr.*, h.name as hotel_name, h.city, h.address, h.phone_number
+            FROM hotel_rooms hr
+            JOIN hotels h ON hr.hotel_id = h.id
+            WHERE hr.id = %s AND hr.is_available = true AND h.is_active = true
+            """
+            room_result = tools_instance.db.execute_query(room_query, (room_id_int,))
+            
+            if not room_result:
+                return f"Room with ID {room_id} not found or not available."
+            
+            room = room_result[0]
+            
+            # Check for conflicting bookings
+            booking_conflict_query = """
+            SELECT COUNT(*) as conflict_count
+            FROM bookings
+            WHERE room_id = %s 
+            AND status = 'confirmed'
+            AND (
+                (check_in <= %s AND check_out > %s) OR
+                (check_in < %s AND check_out >= %s) OR
+                (check_in >= %s AND check_out <= %s)
+            )
+            """
+            
+            conflict_result = tools_instance.db.execute_query(
+                booking_conflict_query, 
+                (room_id_int, check_in, check_in, check_out, check_out, check_in, check_out)
+            )
+            
+            tools_instance.db.disconnect()
+            
+            if conflict_result[0]['conflict_count'] > 0:
+                return f"❌ Room {room['room_number']} at {room['hotel_name']} is not available for {check_in_date} to {check_out_date}. Please choose different dates or another room."
+            
+            # Calculate stay details
+            nights = (check_out - check_in).days
+            total_cost = float(room['price_per_night']) * nights
+            
+            result = f"✅ Room {room['room_number']} at {room['hotel_name']} is available!\n\n"
+            result += f"📅 Check-in: {check_in_date}\n"
+            result += f"📅 Check-out: {check_out_date}\n"
+            result += f"🛏️ Nights: {nights}\n"
+            result += f"🏠 Room Type: {room['room_type']}\n"
+            result += f"👥 Capacity: {room['capacity']} guests\n"
+            result += f"💰 Price per night: ${room['price_per_night']}\n"
+            result += f"💵 Total cost: ${total_cost:.2f}\n\n"
+            result += f"🏨 Hotel: {room['hotel_name']}\n"
+            result += f"📍 Location: {room['address']}, {room['city']}\n"
+            if room.get('phone_number'):
+                result += f"📞 Phone: {room['phone_number']}\n"
+            result += f"\nTo book this room, use the book_room tool with room_id: {room_id}"
+            
+            return result
+            
+        except ValueError:
+            return "Invalid room ID format. Please provide a valid number."
+        except Exception as e:
+            return f"Error checking room availability: {str(e)}"
+
+    @tool
+    def book_room(room_id: str, guest_name: str, guest_email: str, guest_phone: str, check_in_date: str, check_out_date: str) -> str:
+        """Book a room for a guest. All parameters are required. Dates should be in YYYY-MM-DD format."""
+        try:
+            tools_instance = HotelBotTools()
+            
+            # Validate inputs
+            if not all([room_id, guest_name, guest_email, guest_phone, check_in_date, check_out_date]):
+                return "All booking details are required: room_id, guest_name, guest_email, guest_phone, check_in_date, check_out_date."
+            
+            # Validate email format
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, guest_email):
+                return "Invalid email format. Please provide a valid email address."
+            
+            # Validate phone format
+            phone_pattern = r'^\+?[0-9\s\-()]{7,20}$'
+            if not re.match(phone_pattern, guest_phone):
+                return "Invalid phone format. Please provide a valid phone number."
+            
+            # Parse dates
+            try:
+                check_in = datetime.strptime(check_in_date, "%Y-%m-%d").date()
+                check_out = datetime.strptime(check_out_date, "%Y-%m-%d").date()
+            except ValueError:
+                return "Invalid date format. Please use YYYY-MM-DD format (e.g., 2024-12-25)."
+            
+            # Validate dates
+            if check_in >= check_out:
+                return "Check-out date must be after check-in date."
+            
+            if check_in < date.today():
+                return "Check-in date cannot be in the past."
+            
+            room_id_int = int(room_id)
+            
+            tools_instance.db.connect()
+            
+            # Check if room is still available for the requested dates
+            room_check_query = """
+            SELECT hr.*, h.name as hotel_name, h.city, h.address, h.phone_number, h.email as hotel_email
+            FROM hotel_rooms hr
+            JOIN hotels h ON hr.hotel_id = h.id
+            WHERE hr.id = %s AND hr.is_available = true AND h.is_active = true
+            """
+            room_result = tools_instance.db.execute_query(room_check_query, (room_id_int,))
+            
+            if not room_result:
+                tools_instance.db.disconnect()
+                return f"Room with ID {room_id} not found or not available."
+            
+            room = room_result[0]
+            
+            # Check for conflicting bookings
+            booking_conflict_query = """
+            SELECT COUNT(*) as conflict_count
+            FROM bookings
+            WHERE room_id = %s 
+            AND status = 'confirmed'
+            AND (
+                (check_in <= %s AND check_out > %s) OR
+                (check_in < %s AND check_out >= %s) OR
+                (check_in >= %s AND check_out <= %s)
+            )
+            """
+            
+            conflict_result = tools_instance.db.execute_query(
+                booking_conflict_query, 
+                (room_id_int, check_in, check_in, check_out, check_out, check_in, check_out)
+            )
+            
+            if conflict_result[0]['conflict_count'] > 0:
+                tools_instance.db.disconnect()
+                return f"❌ Room {room['room_number']} at {room['hotel_name']} is not available for {check_in_date} to {check_out_date}. Please choose different dates or another room."
+
+            
+            # Calculate booking details
+            nights = (check_out - check_in).days
+            total_amount = float(room['price_per_night']) * nights
+            
+            # Create booking
+            booking_query = """
+            INSERT INTO bookings (room_id, guest_name, guest_email, guest_phone, check_in, check_out, total_amount, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
+            """
+            
+            # Use execute_update for INSERT operations
+            tools_instance.db.cursor.execute(booking_query, 
+                (room_id_int, guest_name, guest_email, guest_phone, check_in, check_out, total_amount, 'confirmed'))
+            tools_instance.db.connection.commit()
+            
+            booking_result = tools_instance.db.cursor.fetchone()
+            
+            if not booking_result:
+                tools_instance.db.disconnect()
+                return "Error creating booking. Please try again."
+            
+            booking_id = booking_result['id']
+            
+            # Update room availability if booking is for current dates
+            if check_in <= date.today() <= check_out:
+                update_query = "UPDATE hotel_rooms SET is_available = FALSE WHERE id = %s"
+                tools_instance.db.execute_update(update_query, (room_id_int,))
+            
+            tools_instance.db.disconnect()
+            
+            # Generate booking confirmation
+            result = f"🎉 Booking Confirmed! 🎉\n\n"
+            result += f"📋 Booking ID: {booking_id}\n"
+            result += f"👤 Guest: {guest_name}\n"
+            result += f"📧 Email: {guest_email}\n"
+            result += f"📞 Phone: {guest_phone}\n\n"
+            result += f"🏨 Hotel: {room['hotel_name']}\n"
+            result += f"📍 Address: {room['address']}, {room['city']}\n"
+            result += f"🏠 Room: {room['room_number']} ({room['room_type']})\n"
+            result += f"👥 Capacity: {room['capacity']} guests\n\n"
+            result += f"📅 Check-in: {check_in_date}\n"
+            result += f"📅 Check-out: {check_out_date}\n"
+            result += f"🛏️ Nights: {nights}\n"
+            result += f"💰 Rate: ${room['price_per_night']}/night\n"
+            result += f"💵 Total Amount: ${total_amount:.2f}\n\n"
+            if room.get('hotel_email'):
+                result += f"For any inquiries, contact the hotel at {room['hotel_email']}"
+                if room.get('phone_number'):
+                    result += f" or {room['phone_number']}"
+            result += f"\n\nThank you for choosing {room['hotel_name']}! 🌟"
+            
+            return result
+            
+        except ValueError:
+            return "Invalid room ID format. Please provide a valid number."
+        except Exception as e:
+            return f"Error booking room: {str(e)}"
+
+    @tool
+    def get_booking_details(booking_id: str) -> str:
+        """Get details of a specific booking by booking ID."""
+        try:
+            tools_instance = HotelBotTools()
+            booking_id_int = int(booking_id)
+            
+            tools_instance.db.connect()
+            
+            booking_query = """
+            SELECT b.*, 
+                   hr.room_number, hr.room_type, hr.capacity, hr.price_per_night,
+                   h.name as hotel_name, h.city, h.address, h.phone_number, h.email as hotel_email
+            FROM bookings b
+            JOIN hotel_rooms hr ON b.room_id = hr.id
+            JOIN hotels h ON hr.hotel_id = h.id
+            WHERE b.id = %s
+            """
+            
+            booking_result = tools_instance.db.execute_query(booking_query, (booking_id_int,))
+            
+            if not booking_result:
+                tools_instance.db.disconnect()
+                return f"Booking with ID {booking_id} not found."
+            
+            booking = booking_result[0]
+            tools_instance.db.disconnect()
+            
+            # Calculate nights
+            nights = (booking['check_out'] - booking['check_in']).days
+            
+            result = f"📋 Booking Details (ID: {booking_id})\n\n"
+            result += f"👤 Guest: {booking['guest_name']}\n"
+            result += f"📧 Email: {booking['guest_email']}\n"
+            result += f"📞 Phone: {booking['guest_phone']}\n\n"
+            result += f"🏨 Hotel: {booking['hotel_name']}\n"
+            result += f"📍 Address: {booking['address']}, {booking['city']}\n"
+            result += f"🏠 Room: {booking['room_number']} ({booking['room_type']})\n"
+            result += f"👥 Capacity: {booking['capacity']} guests\n\n"
+            result += f"📅 Check-in: {booking['check_in']}\n"
+            result += f"📅 Check-out: {booking['check_out']}\n"
+            result += f"🛏️ Nights: {nights}\n"
+            result += f"💰 Rate: ${booking['price_per_night']}/night\n"
+            result += f"💵 Total Amount: ${booking['total_amount']:.2f}\n"
+            result += f"📊 Status: {booking['status'].upper()}\n"
+            result += f"📅 Booked on: {booking['created_at'].strftime('%Y-%m-%d %H:%M')}\n\n"
+            
+            if booking.get('hotel_email'):
+                result += f"For inquiries, contact: {booking['hotel_email']}"
+                if booking.get('phone_number'):
+                    result += f" or {booking['phone_number']}"
+            
+            return result
+            
+        except ValueError:
+            return "Invalid booking ID format. Please provide a valid number."
+        except Exception as e:
+            return f"Error retrieving booking details: {str(e)}"
+
+    @tool
+    def cancel_booking(booking_id: str, reason: str = "Guest requested") -> str:
+        """Cancel a booking by booking ID. Optionally provide a reason for cancellation."""
+        try:
+            tools_instance = HotelBotTools()
+            booking_id_int = int(booking_id)
+            
+            tools_instance.db.connect()
+            
+            # Get booking details first
+            booking_query = """
+            SELECT b.*, 
+                   hr.room_number, hr.room_type,
+                   h.name as hotel_name
+            FROM bookings b
+            JOIN hotel_rooms hr ON b.room_id = hr.id
+            JOIN hotels h ON hr.hotel_id = h.id
+            WHERE b.id = %s AND b.status = 'confirmed'
+            """
+            
+            booking_result = tools_instance.db.execute_query(booking_query, (booking_id_int,))
+            
+            if not booking_result:
+                tools_instance.db.disconnect()
+                return f"Booking with ID {booking_id} not found or already cancelled."
+            
+            booking = booking_result[0]
+            
+            # Update booking status
+            cancel_query = "UPDATE bookings SET status = 'cancelled' WHERE id = %s"
+            tools_instance.db.execute_update(cancel_query, (booking_id_int,))
+            
+            # If booking was for current dates, make room available again
+            if booking['check_in'] <= date.today() <= booking['check_out']:
+                room_query = "UPDATE hotel_rooms SET is_available = TRUE WHERE id = %s"
+                tools_instance.db.execute_update(room_query, (booking['room_id'],))
+            
+            tools_instance.db.disconnect()
+            
+            result = f"❌ Booking Cancelled\n\n"
+            result += f"📋 Booking ID: {booking_id}\n"
+            result += f"👤 Guest: {booking['guest_name']}\n"
+            result += f"🏨 Hotel: {booking['hotel_name']}\n"
+            result += f"🏠 Room: {booking['room_number']} ({booking['room_type']})\n"
+            result += f"📅 Original dates: {booking['check_in']} to {booking['check_out']}\n"
+            result += f"💵 Refund amount: ${booking['total_amount']:.2f}\n"
+            result += f"📝 Reason: {reason}\n\n"
+            result += f"The booking has been successfully cancelled. "
+            
+            if booking['check_in'] > date.today():
+                result += f"The room is now available for other guests."
+            
+            return result
+            
+        except ValueError:
+            return "Invalid booking ID format. Please provide a valid number."
+        except Exception as e:
+            return f"Error cancelling booking: {str(e)}"
+
+    @tool
+    def search_available_rooms_by_dates(city: str, check_in_date: str, check_out_date: str, room_type: str = "", max_price: str = "") -> str:
+        """Search for available rooms in a city for specific dates. Room type and max price are optional filters."""
+        try:
+            tools_instance = HotelBotTools()
+            
+            # Parse dates
+            try:
+                check_in = datetime.strptime(check_in_date, "%Y-%m-%d").date()
+                check_out = datetime.strptime(check_out_date, "%Y-%m-%d").date()
+            except ValueError:
+                return "Invalid date format. Please use YYYY-MM-DD format (e.g., 2024-12-25)."
+            
+            # Validate dates
+            if check_in >= check_out:
+                return "Check-out date must be after check-in date."
+            
+            if check_in < date.today():
+                return "Check-in date cannot be in the past."
+            
+            tools_instance.db.connect()
+            
+            # Build query with date availability check
+            query = """
+            SELECT hr.*, h.name as hotel_name, h.city, h.address, h.stars, h.amenities
+            FROM hotel_rooms hr
+            JOIN hotels h ON hr.hotel_id = h.id
+            WHERE h.is_active = true 
+            AND hr.is_available = true
+            AND LOWER(h.city) LIKE LOWER(%s)
+            AND hr.id NOT IN (
+                SELECT DISTINCT room_id 
+                FROM bookings 
+                WHERE status = 'confirmed' 
+                AND (
+                    (check_in <= %s AND check_out > %s) OR
+                    (check_in < %s AND check_out >= %s) OR
+                    (check_in >= %s AND check_out <= %s)
+                )
+            )
+            """
+            
+            params = [f"%{city}%", check_in, check_in, check_out, check_out, check_in, check_out]
+            
+            # Add optional filters
+            if room_type:
+                query += " AND LOWER(hr.room_type::text) LIKE LOWER(%s)"
+                params.append(f"%{room_type}%")
+            
+            if max_price:
+                try:
+                    max_price_float = float(max_price)
+                    query += " AND hr.price_per_night <= %s"
+                    params.append(max_price_float)
+                except ValueError:
+                    pass
+            
+            query += " ORDER BY h.stars DESC, hr.price_per_night ASC"
+            
+            rooms = tools_instance.db.execute_query(query, params)
+            tools_instance.db.disconnect()
+            
+            if not rooms:
+                return f"No available rooms found in {city} for {check_in_date} to {check_out_date}."
+            
+            # Calculate stay details
+            nights = (check_out - check_in).days
+            
+            result = f"Found {len(rooms)} available rooms in {city} for {check_in_date} to {check_out_date} ({nights} nights):\n\n"
+            
+            for room in rooms:
+                total_cost = float(room['price_per_night']) * nights
+                
+                result += f"🏨 **{room['hotel_name']}** ({room['stars']} stars)\n"
+                result += f"   📍 {room['address']}, {room['city']}\n"
+                result += f"   🏠 Room {room['room_number']} - {room['room_type']}\n"
+                result += f"   👥 Capacity: {room['capacity']} guests\n"
+                result += f"   💰 ${room['price_per_night']}/night × {nights} nights = ${total_cost:.2f}\n"
+                result += f"   🆔 Room ID: {room['id']}\n"
+                if room.get('amenities'):
+                    result += f"   🎯 Amenities: {', '.join(room['amenities'])}\n"
+                result += f"   📋 To book: use room_id {room['id']}\n\n"
+            
+            return result
+            
+        except Exception as e:
+            return f"Error searching available rooms: {str(e)}"
 
 
 class HotelBotLangGraph:
@@ -338,7 +803,12 @@ class HotelBotLangGraph:
             HotelBotTools.get_room_types_and_prices,
             HotelBotTools.search_hotels_by_price_range,
             HotelBotTools.get_hotel_details,
-            HotelBotTools.search_hotel_by_name
+            HotelBotTools.search_hotel_by_name,
+            HotelBotTools.check_room_availability_by_dates,
+            HotelBotTools.book_room,
+            HotelBotTools.get_booking_details,
+            HotelBotTools.cancel_booking,
+            HotelBotTools.search_available_rooms_by_dates
         ]
         
         # Create the LLM with tools
@@ -359,17 +829,34 @@ class HotelBotLangGraph:
         # Define the chatbot node
         def chatbot(state: State):
             """Main chatbot logic"""
-            system_message = """You are a helpful and friendly hotel booking assistant. Your name is HotelBot. 
+            current_date = date.today().strftime("%Y-%m-%d")
+            system_message = f"""You are a helpful and friendly hotel booking assistant. Your name is HotelBot. 
+
+Today's date is {current_date}.
 
 You have access to a comprehensive hotel database and can help users:
 - Search for hotels in specific cities
-- Find hotels by rating
+- Find hotels by rating/stars
 - Check room availability and types
 - Get price information
 - Provide detailed hotel information
 - Search for specific hotels by name
+- Check room availability for specific dates
+- Book rooms for guests
+- View booking details
+- Cancel bookings
+- Search for available rooms by dates and location
 
-Guidelines:
+Booking Process Guidelines:
+- When users want to book a room, collect ALL required information: room_id, guest_name, guest_email, guest_phone, check_in_date, check_out_date
+- Always check room availability for specific dates before booking
+- Use YYYY-MM-DD format for dates (e.g., 2025-07-25)
+- Validate that check-in date is not in the past and check-out is after check-in
+- After booking, provide complete confirmation details including booking ID
+- For date searches, ask users for their preferred check-in and check-out dates
+- Always show total cost calculations (price per night × number of nights)
+
+General Guidelines:
 - Be conversational and friendly
 - Ask clarifying questions when needed
 - Provide detailed, helpful responses
@@ -377,9 +864,11 @@ Guidelines:
 - Remember the conversation context from previous messages
 - When users ask about room types or availability at a specific hotel, use the hotel name or ID from previous search results
 - If a user asks about "this hotel" or "that hotel", refer to the most recently mentioned hotel in the conversation
-- Always include hotel IDs in search results so users can reference them later
-- If a user asks about booking, explain that you can help them find hotels and rooms, but they would need to contact the hotel directly for actual booking
+- Always include hotel IDs and room IDs in search results so users can reference them later
 - When showing hotel or room information, include relevant details like prices, ratings, and availability
+- For booking confirmations, provide booking ID and all relevant details
+
+Date Format: Always use YYYY-MM-DD format for dates (e.g., 2025-07-25, 2025-08-01)
 
 Remember: When users ask follow-up questions about a specific hotel, use the search_hotel_by_name tool or get_hotel_details with the hotel ID to get current information.
 
@@ -394,12 +883,18 @@ Always be helpful and provide the most relevant information based on the user's 
             tool_calls = [tc for tc in state["messages"][-1].tool_calls if tc["name"] == "search_hotels_by_city"]
             results = []
             
+            if not tool_calls:
+                return {"messages": []}
+            
             # Execute multiple calls of the same tool in parallel using ThreadPoolExecutor
             def execute_tool_call(tool_call):
-                result = HotelBotTools.search_hotels_by_city.invoke(tool_call["args"])
-                return ToolMessage(content=result, tool_call_id=tool_call["id"])
+                try:
+                    result = HotelBotTools.search_hotels_by_city.invoke(tool_call["args"])
+                    return ToolMessage(content=result, tool_call_id=tool_call["id"])
+                except Exception as e:
+                    return ToolMessage(content=f"Error: {str(e)}", tool_call_id=tool_call["id"])
             
-            with ThreadPoolExecutor(max_workers=len(tool_calls)) as executor:
+            with ThreadPoolExecutor(max_workers=min(len(tool_calls), 5)) as executor:
                 future_to_tool = {executor.submit(execute_tool_call, tc): tc for tc in tool_calls}
                 for future in as_completed(future_to_tool):
                     results.append(future.result())
@@ -495,12 +990,87 @@ Always be helpful and provide the most relevant information based on the user's 
                     results.append(future.result())
             
             return {"messages": results}
+        
+        def check_room_availability_by_dates_node(state: State):
+            tool_calls = [tc for tc in state["messages"][-1].tool_calls if tc["name"] == "check_room_availability_by_dates"]
+            results = []
+            
+            def execute_tool_call(tool_call):
+                result = HotelBotTools.check_room_availability_by_dates.invoke(tool_call["args"])
+                return ToolMessage(content=result, tool_call_id=tool_call["id"])
+            
+            with ThreadPoolExecutor(max_workers=len(tool_calls)) as executor:
+                future_to_tool = {executor.submit(execute_tool_call, tc): tc for tc in tool_calls}
+                for future in as_completed(future_to_tool):
+                    results.append(future.result())
+            
+            return {"messages": results}
+        
+        def book_room_node(state: State):
+            tool_calls = [tc for tc in state["messages"][-1].tool_calls if tc["name"] == "book_room"]
+            results = []
+            
+            def execute_tool_call(tool_call):
+                result = HotelBotTools.book_room.invoke(tool_call["args"])
+                return ToolMessage(content=result, tool_call_id=tool_call["id"])
+            
+            with ThreadPoolExecutor(max_workers=len(tool_calls)) as executor:
+                future_to_tool = {executor.submit(execute_tool_call, tc): tc for tc in tool_calls}
+                for future in as_completed(future_to_tool):
+                    results.append(future.result())
+            
+            return {"messages": results}
+        
+        def get_booking_details_node(state: State):
+            tool_calls = [tc for tc in state["messages"][-1].tool_calls if tc["name"] == "get_booking_details"]
+            results = []
+            
+            def execute_tool_call(tool_call):
+                result = HotelBotTools.get_booking_details.invoke(tool_call["args"])
+                return ToolMessage(content=result, tool_call_id=tool_call["id"])
+            
+            with ThreadPoolExecutor(max_workers=len(tool_calls)) as executor:
+                future_to_tool = {executor.submit(execute_tool_call, tc): tc for tc in tool_calls}
+                for future in as_completed(future_to_tool):
+                    results.append(future.result())
+            
+            return {"messages": results}
+        
+        def cancel_booking_node(state: State):
+            tool_calls = [tc for tc in state["messages"][-1].tool_calls if tc["name"] == "cancel_booking"]
+            results = []
+            
+            def execute_tool_call(tool_call):
+                result = HotelBotTools.cancel_booking.invoke(tool_call["args"])
+                return ToolMessage(content=result, tool_call_id=tool_call["id"])
+            
+            with ThreadPoolExecutor(max_workers=len(tool_calls)) as executor:
+                future_to_tool = {executor.submit(execute_tool_call, tc): tc for tc in tool_calls}
+                for future in as_completed(future_to_tool):
+                    results.append(future.result())
+            
+            return {"messages": results}
+        
+        def search_available_rooms_by_dates_node(state: State):
+            tool_calls = [tc for tc in state["messages"][-1].tool_calls if tc["name"] == "search_available_rooms_by_dates"]
+            results = []
+            
+            def execute_tool_call(tool_call):
+                result = HotelBotTools.search_available_rooms_by_dates.invoke(tool_call["args"])
+                return ToolMessage(content=result, tool_call_id=tool_call["id"])
+            
+            with ThreadPoolExecutor(max_workers=len(tool_calls)) as executor:
+                future_to_tool = {executor.submit(execute_tool_call, tc): tc for tc in tool_calls}
+                for future in as_completed(future_to_tool):
+                    results.append(future.result())
+            
+            return {"messages": results}
         # Route to appropriate tool nodes
         def route_tools(state: State):
             """Route to appropriate tool nodes based on tool calls - enables parallel execution"""
             last_message = state["messages"][-1]
             
-            if not last_message.tool_calls:
+            if not hasattr(last_message, 'tool_calls') or not last_message.tool_calls:
                 return END
             
             # Group tool calls by tool name to enable parallel execution
@@ -515,8 +1085,12 @@ Always be helpful and provide the most relevant information based on the user's 
             sends = []
             for tool_name, tool_calls in tool_groups.items():
                 # Create a message with only the tool calls for this specific tool
-                tool_message = last_message.copy()
-                tool_message.tool_calls = tool_calls
+                try:
+                    tool_message = last_message.model_copy()
+                    tool_message.tool_calls = tool_calls
+                except Exception:
+                    # Fallback if model_copy fails
+                    tool_message = last_message
                 
                 if tool_name == "search_hotels_by_city":
                     sends.append(Send("search_hotels_by_city_node", {"messages": [tool_message]}))
@@ -532,8 +1106,18 @@ Always be helpful and provide the most relevant information based on the user's 
                     sends.append(Send("get_hotel_details_node", {"messages": [tool_message]}))
                 elif tool_name == "search_hotel_by_name":
                     sends.append(Send("search_hotel_by_name_node", {"messages": [tool_message]}))
+                elif tool_name == "check_room_availability_by_dates":
+                    sends.append(Send("check_room_availability_by_dates_node", {"messages": [tool_message]}))
+                elif tool_name == "book_room":
+                    sends.append(Send("book_room_node", {"messages": [tool_message]}))
+                elif tool_name == "get_booking_details":
+                    sends.append(Send("get_booking_details_node", {"messages": [tool_message]}))
+                elif tool_name == "cancel_booking":
+                    sends.append(Send("cancel_booking_node", {"messages": [tool_message]}))
+                elif tool_name == "search_available_rooms_by_dates":
+                    sends.append(Send("search_available_rooms_by_dates_node", {"messages": [tool_message]}))
             
-            return sends
+            return sends if sends else END
         
         # Add nodes to the graph
         workflow.add_node("chatbot", chatbot)
@@ -544,6 +1128,11 @@ Always be helpful and provide the most relevant information based on the user's 
         workflow.add_node("search_hotels_by_price_range_node", search_hotels_by_price_range_node)
         workflow.add_node("get_hotel_details_node", get_hotel_details_node)
         workflow.add_node("search_hotel_by_name_node", search_hotel_by_name_node)
+        workflow.add_node("check_room_availability_by_dates_node", check_room_availability_by_dates_node)
+        workflow.add_node("book_room_node", book_room_node)
+        workflow.add_node("get_booking_details_node", get_booking_details_node)
+        workflow.add_node("cancel_booking_node", cancel_booking_node)
+        workflow.add_node("search_available_rooms_by_dates_node", search_available_rooms_by_dates_node)
         
         # Add edges
         workflow.add_edge(START, "chatbot")
@@ -557,6 +1146,11 @@ Always be helpful and provide the most relevant information based on the user's 
         workflow.add_edge("search_hotels_by_price_range_node", "chatbot")
         workflow.add_edge("get_hotel_details_node", "chatbot")
         workflow.add_edge("search_hotel_by_name_node", "chatbot")
+        workflow.add_edge("check_room_availability_by_dates_node", "chatbot")
+        workflow.add_edge("book_room_node", "chatbot")
+        workflow.add_edge("get_booking_details_node", "chatbot")
+        workflow.add_edge("cancel_booking_node", "chatbot")
+        workflow.add_edge("search_available_rooms_by_dates_node", "chatbot")
         
         # Compile the graph
         return workflow.compile(checkpointer=self.memory)
@@ -567,8 +1161,11 @@ Always be helpful and provide the most relevant information based on the user's 
             # Create the input
             input_message = {"messages": [HumanMessage(content=message)]}
             
-            # Configure the thread
-            config = {"configurable": {"thread_id": thread_id}}
+            # Configure the thread with recursion limit
+            config = {
+                "configurable": {"thread_id": thread_id},
+                "recursion_limit": 50  # Increase recursion limit
+            }
             
             # Run the graph
             result = self.app.invoke(input_message, config)
@@ -615,8 +1212,14 @@ Always be helpful and provide the most relevant information based on the user's 
 def main():
     """Main function to run the LangGraph chatbot"""
     print("🏨 Welcome to HotelBot (LangGraph Edition)! 🏨")
-    print("I can help you find hotels, check room availability, and get pricing information.")
-    print("Type 'quit' to exit, 'reset' to clear conversation history, or 'graph' to see the graph structure.\n")
+    print("I can help you find hotels, check room availability, get pricing information, and book rooms!")
+    print("Available features:")
+    print("  • Search hotels by city, rating, or price range")
+    print("  • Check room availability for specific dates")
+    print("  • Book rooms (I'll collect all your details)")
+    print("  • View and cancel bookings")
+    print("  • Get detailed hotel information")
+    print("\nType 'quit' to exit, 'reset' to clear conversation history, or 'graph' to see the graph structure.\n")
     
     try:
         # Initialize chatbot
