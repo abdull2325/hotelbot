@@ -1,15 +1,18 @@
 # HotelBot - AI-Powered Hotel Booking System
 
-A Python-based hotel booking system with PostgreSQL database integration and an AI-powered chatbot using LangChain.
+A Python-based hotel booking system with PostgreSQL database integration and dual AI-powered chatbot implementations using both LangChain and LangGraph.
 
 ## Features
 
 - **Database Management**: PostgreSQL database connectivity with hotel, room, and booking management
-- **AI Chatbot**: LangChain-powered chatbot for natural language hotel search and booking assistance
+- **Dual AI Chatbots**: 
+  - **LangChain**: Traditional agent-based chatbot for natural language hotel search
+  - **LangGraph**: Advanced graph-based chatbot with better control flow and debugging
 - **Hotel Search**: Search hotels by city, rating, price range, and availability
 - **Room Management**: Check room availability, types, and pricing
 - **Comprehensive Data**: Pre-populated with realistic hotel and booking data
 - **Interactive Interface**: Command-line interface with menu options
+- **Performance Comparison**: Side-by-side comparison of both chatbot implementations
 
 ## Prerequisites
 
@@ -64,10 +67,29 @@ python main.py
 ```
 
 **Menu Options:**
-1. **🤖 Start Interactive ChatBot** - Launch the AI-powered hotel search assistant
-2. **🔍 View Database Contents** - Display formatted database contents
-3. **📊 Test Database Connection** - Test database connectivity
-4. **🚪 Exit** - Exit the application
+1. **🤖 Start Interactive ChatBot (LangChain)** - Traditional agent-based chatbot
+2. **🔗 Start Interactive ChatBot (LangGraph)** - Advanced graph-based chatbot
+3. **🔍 View Database Contents** - Display formatted database contents
+4. **📊 Test Database Connection** - Test database connectivity
+5. **🆚 Compare Both Chatbots** - Side-by-side comparison of both implementations
+6. **🚪 Exit** - Exit the application
+
+### Individual Chatbot Access
+
+#### LangChain Chatbot (Original)
+```bash
+python chatbot.py
+```
+
+#### LangGraph Chatbot (Enhanced)
+```bash
+python chatbot_langgraph.py
+```
+
+### Chatbot Comparison and Testing
+```bash
+python test_langgraph_chatbot.py
+```
 
 ### Populate Database with Sample Data
 
@@ -94,7 +116,33 @@ python test_chatbot.py
 
 ## Chatbot Capabilities
 
-The AI chatbot can help users with:
+Both AI chatbots (LangChain and LangGraph) can help users with:
+
+- **🏨 Hotel Search**: "Find hotels in New York"
+- **⭐ Rating Filter**: "Show me hotels with 4+ star rating"
+- **💰 Price Search**: "Find hotels under $200 per night"
+- **🏠 Room Availability**: "What rooms are available at Grand Palace Hotel?"
+- **🛏️ Room Types**: "Show me all suite rooms"
+- **📍 City Information**: "Tell me about hotels in Miami"
+- **🔍 Specific Hotels**: "Give me details about Boutique Hotel"
+
+## LangChain vs LangGraph
+
+### LangChain Chatbot (Original)
+- **Architecture**: Agent-based with AgentExecutor
+- **Memory**: ConversationBufferWindowMemory
+- **Best for**: Simple use cases, rapid prototyping
+- **Pros**: Easy to implement, good for getting started
+- **Cons**: Limited control flow, harder to debug
+
+### LangGraph Chatbot (Enhanced)
+- **Architecture**: Graph-based with StateGraph
+- **Memory**: Thread-based with MemorySaver
+- **Best for**: Production environments, complex workflows
+- **Pros**: Better control flow, enhanced debugging, improved performance
+- **Cons**: More complex to implement initially
+
+For detailed comparison, see [LANGGRAPH_COMPARISON.md](LANGGRAPH_COMPARISON.md)
 
 - **🏨 Hotel Search**: "Find hotels in New York"
 - **⭐ Rating Filter**: "Show me hotels with 4+ star rating"
@@ -106,6 +154,7 @@ The AI chatbot can help users with:
 
 ### Example Chatbot Conversations
 
+#### LangChain Chatbot
 ```
 You: Find hotels in San Francisco
 🤖 HotelBot: Found 1 hotels in San Francisco:
@@ -119,22 +168,39 @@ You: What rooms are available under $200?
 🤖 HotelBot: Found 59 available rooms under $200...
 ```
 
+#### LangGraph Chatbot
+```
+You: Find hotels in San Francisco
+🤖 HotelBot: Found 1 hotels in San Francisco:
+🏨 Boutique Hotel (Hotel ID: 5)
+   📍 147 Trendy Ave
+   ⭐ Rating: 4.6/5.0
+   🏠 Total Rooms: 27
+   ✅ Available Rooms: 27
+
+You: Show me more details about that hotel
+🤖 HotelBot: [Uses conversation context to provide detailed information]
+```
+
 ## Project Structure
 
 ```
 hotelbot/
-├── main.py                     # Main application with menu
-├── chatbot.py                  # LangChain-powered chatbot
-├── hotel_search_service.py     # Database search service
-├── database.py                 # Database connection and operations
-├── populate_data.py            # Database population script
-├── view_data.py               # Database content viewer
-├── test_chatbot.py            # Chatbot testing script
-├── requirements.txt           # Python dependencies
-├── .env                       # Environment variables
+├── main.py                      # Main application with menu
+├── chatbot.py                   # LangChain-powered chatbot (original)
+├── chatbot_langgraph.py         # LangGraph-powered chatbot (enhanced)
+├── hotel_search_service.py      # Database search service
+├── database.py                  # Database connection and operations
+├── populate_data.py             # Database population script
+├── view_data.py                # Database content viewer
+├── test_chatbot.py             # Original chatbot testing script
+├── test_langgraph_chatbot.py   # LangGraph chatbot testing and comparison
+├── requirements.txt            # Python dependencies
+├── .env                        # Environment variables
+├── LANGGRAPH_COMPARISON.md     # Detailed comparison of both chatbots
 ├── .github/
 │   └── copilot-instructions.md
-└── README.md                  # This file
+└── README.md                   # This file
 ```
 
 ## Database Schema
@@ -171,14 +237,16 @@ hotelbot/
 
 - **Backend**: Python 3.8+
 - **Database**: PostgreSQL with psycopg2
-- **AI Framework**: LangChain
+- **AI Frameworks**: 
+  - LangChain (traditional agent-based)
+  - LangGraph (advanced graph-based)
 - **LLM**: OpenAI GPT-3.5-turbo
 - **Environment**: python-dotenv
 - **Data**: Realistic hotel and booking data
 
 ## API Capabilities
 
-The chatbot uses these search functions:
+Both chatbots use these search functions:
 - `search_hotels_by_city(city)` - Find hotels in specific cities
 - `search_hotels_by_rating(min_rating)` - Find highly-rated hotels
 - `search_hotels_by_price_range(min_price, max_price)` - Find hotels within budget

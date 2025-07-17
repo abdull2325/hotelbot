@@ -58,15 +58,17 @@ def main():
     
     while True:
         print("\nChoose an option:")
-        print("1. 🤖 Start Interactive ChatBot")
-        print("2. 🔍 View Database Contents")
-        print("3. 📊 Test Database Connection")
-        print("4. 🚪 Exit")
+        print("1. 🤖 Start Interactive ChatBot (LangChain)")
+        print("2. � Start Interactive ChatBot (LangGraph)")
+        print("3. �🔍 View Database Contents")
+        print("4. 📊 Test Database Connection")
+        print("5. 🆚 Compare Both Chatbots")
+        print("6. 🚪 Exit")
         
-        choice = input("\nEnter your choice (1-4): ").strip()
+        choice = input("\nEnter your choice (1-6): ").strip()
         
         if choice == "1":
-            print("\n🤖 Starting ChatBot...")
+            print("\n🤖 Starting LangChain ChatBot...")
             print("Make sure you have set your OpenAI API key in the .env file!")
             
             if not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") == "your_openai_api_key_here":
@@ -74,25 +76,48 @@ def main():
                 print("Add: OPENAI_API_KEY=your_actual_api_key")
                 continue
             
-            # Import and run chatbot
+            # Import and run original chatbot
             from chatbot import main as chatbot_main
             chatbot_main()
             
         elif choice == "2":
-            print("\n🔍 Loading Database Contents...")
+            print("\n� Starting LangGraph ChatBot...")
+            print("Make sure you have set your OpenAI API key in the .env file!")
+            
+            if not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") == "your_openai_api_key_here":
+                print("⚠️  Please set your OpenAI API key in the .env file first.")
+                print("Add: OPENAI_API_KEY=your_actual_api_key")
+                continue
+            
+            # Import and run LangGraph chatbot
+            from chatbot_langgraph import main as langgraph_main
+            langgraph_main()
+            
+        elif choice == "3":
+            print("\n�🔍 Loading Database Contents...")
             from view_data import display_database_contents
             display_database_contents()
             
-        elif choice == "3":
+        elif choice == "4":
             print("\n📊 Testing Database Connection...")
             test_database_connection()
             
-        elif choice == "4":
+        elif choice == "5":
+            print("\n🆚 Starting Chatbot Comparison...")
+            if not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") == "your_openai_api_key_here":
+                print("⚠️  Please set your OpenAI API key in the .env file first.")
+                print("Add: OPENAI_API_KEY=your_actual_api_key")
+                continue
+            
+            from test_langgraph_chatbot import interactive_comparison
+            interactive_comparison()
+            
+        elif choice == "6":
             print("\n👋 Thank you for using HotelBot System!")
             break
             
         else:
-            print("❌ Invalid choice. Please enter 1-4.")
+            print("❌ Invalid choice. Please enter 1-6.")
 
 if __name__ == "__main__":
     main()
