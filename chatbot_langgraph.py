@@ -634,7 +634,7 @@ class HotelBotLangGraph:
         # Initialize LLM
         self.llm = ChatOpenAI(
             temperature=0.3,
-            model="gpt-4",
+            model="gpt-4.1-nano-2025-04-14",
             openai_api_key=self.openai_api_key
         )
         
